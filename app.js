@@ -15,6 +15,7 @@ configSocket.connect('tcp://' + matrix_ip + ':' + matrix_wakeword_base_port /* c
 var config = matrix_io.malos.v1.driver.DriverConfig.create(
 { // Create & Set wakeword configurations
   wakeword: matrix_io.malos.v1.io.WakeWordParams.create({
+    lmPath: LM_PATH,
     dicPath: DIC_PATH,
     channel: matrix_io.malos.v1.io.WakeWordParams.MicChannel.channel8,
     enableVerbose: true
