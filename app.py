@@ -2,112 +2,84 @@
 import os # Miscellaneous operating system interface
 import zmq # Asynchronous messaging framework
 import time # Time access and conversions
-from random import randint # Random numbers
 import sys # System-specific parameters and functions
 from matrix_io.proto.malos.v1 import driver_pb2 # MATRIX Protocol Buffer driver library
-from matrix_io.proto.malos.v1 import io_pb2 # MATRIX Protocol Buffer sensor library
-from multiprocessing import Process, Manager, Value # Allow for multiple processes at once
-from zmq.eventloop import ioloop, zmqstream# Asynchronous events through ZMQ
+from matrix_io.proto.malos.v1 import io_pb2 # MATRIX Protocol Buffer io library
+from multiprocessing import Process # Allow for multiple processes at once
+from zmq.eventloop import ioloop # Asynchronous events through ZMQ
 matrix_ip = '127.0.0.1' # Local device ip
-everloop_port = 20021 # Driver Base port
-led_count = 0 # Amount of LEDs on MATRIX device
-# Handy function for connecting to the Error port 
-from utils import register_error_callback
+wakeword_port = 60001 # Driver Base port
+# Handy functions for connecting to the Data Update, & Error port 
+from utils import register_data_callback, register_error_callback
+# Sphinx Knowledge Base files
+LM_PATH = '2585.lm'# Language Model File
+DIC_PATH = '2585.dic'# Dictation File
 
 ## BASE PORT ##
-def config_socket(ledCount):  
+def config_socket():
     # Define zmq socket
     context = zmq.Context()
     # Create a Pusher socket
     socket = context.socket(zmq.PUSH)
     # Connect Pusher to configuration socket
-    socket.connect('tcp://{0}:{1}'.format(matrix_ip, everloop_port))
+    socket.connect('tcp://{0}:{1}'.format(matrix_ip, wakeword_port))
+    
+    # Create a new driver config
+    config = driver_pb2.DriverConfig()
+    # Language Model File
+    config.wakeword.lm_path = LM_PATH
+    # Dictation File
+    config.wakeword.dic_path = DIC_PATH
+    # Desired MATRIX microphone
+    config.wakeword.channel = 8
+    # Enable verbose option
+    config.wakeword.enable_verbose = False
 
-    # Loop forever
-    while True:
-        # Create a new driver config
-        driver_config_proto = driver_pb2.DriverConfig()
-        # Create an empty Everloop image
-        image = []
-        # For each device LED
-        for led in range(ledCount):
-            # Set individual LED value
-            ledValue = io_pb2.LedValue()
-            ledValue.blue = randint(0, 50)
-            ledValue.red = randint(0, 200)
-            ledValue.green = randint(0, 255)
-            ledValue.white = 0
-            image.append(ledValue)
-        # Store the Everloop image in driver configuration
-        driver_config_proto.image.led.extend(image)
+    # Send driver configuration through ZMQ socket
+    socket.send(config.SerializeToString())
+    print ('Listening for wakewords')
 
-        # Send driver configuration through ZMQ socket
-        socket.send(driver_config_proto.SerializeToString())
-        #Wait before restarting loop
-        time.sleep(0.05)
-
-## KEEP ALIVE ##
+## KEEP-ALIVE PORT ##
 def ping_socket():
     # Define zmq socket
     context = zmq.Context()
     # Create a Pusher socket
     ping_socket = context.socket(zmq.PUSH)
     # Connect to the socket
-    ping_socket.connect('tcp://{0}:{1}'.format(matrix_ip, everloop_port+1))
-    # Ping with empty string to let the drive know we're still listening
-    ping_socket.send_string('')
+    ping_socket.connect('tcp://{0}:{1}'.format(matrix_ip, wakeword_port+1))
+    # Send a ping every 2 seconds
+    while True:
+        ping_socket.send_string('')
+        time.sleep(2)
 
-## ERROR PORT ##
-def everloop_error_callback(error):
+## ERROR PORT ## (!Currently Experiencing False Errors!)
+def wakeword_error_callback(error):
     # Log error
     print('{0}'.format(error))
 
 ## DATA UPDATE PORT ##
-def update_socket():
-    # Define zmq socket
-    context = zmq.Context()
-    # Create a Subscriber socket
-    socket = context.socket(zmq.SUB)
-    # Connect to the Data Update port
-    socket.connect('tcp://{0}:{1}'.format(matrix_ip, everloop_port+3))
-    # Connect Subscriber to Error port
-    socket.setsockopt(zmq.SUBSCRIBE, b'')
-    # Create the stream to listen to data from port
-    stream = zmqstream.ZMQStream(socket)
+def wakeword_data_callback(data):
+    # Extract data
+    data = io_pb2.WakeWordParams().FromString(data[0])
+    # Log data 
+    print('{0}'.format(data))
+    # Run actions based on the phrase heard
+    # CHANGE TO YOUR PHRASE
+    if data.wake_word == 'MATRIX START':
+        print ('I HEARD MATRIX START!\n')
+    # CHANGE TO YOUR PHRASE
+    elif data.wake_word == 'MATRIX STOP':
+        print ('I HEARD MATRIX STOP!\n')
 
-    # Function to update LED count and close connection to the Data Update Port
-    def updateLedCount(data):
-        # Extract data and pass into led_count global variable
-        global led_count
-        led_count = io_pb2.LedValue().FromString(data[0]).green
-        # Log LEDs
-        print('{0} LEDs counted'.format(led_count))
-        # If LED count obtained
-        if led_count > 0:
-            # Close Data Update Port connection
-            ioloop.IOLoop.instance().stop()
-            print('LED count obtained. Disconnecting from data publisher {0}'.format(everloop_port+3))
-    # Call updateLedCount() once data is received
-    stream.on_recv(updateLedCount)
-
-    # Log and begin event loop for ZMQ connection to Data Update Port
-    print('Connected to data publisher with port {0}'.format(everloop_port+3))
-    ioloop.IOLoop.instance().start()
-
-## START  PROCESSES ##
+## Start Processes ##
 if __name__ == '__main__':
     # Initiate asynchronous events
     ioloop.install()
+    # Send Base Port configuration 
+    config_socket()
     # Start Error Port connection
-    Process(target=register_error_callback, args=(everloop_error_callback, matrix_ip, everloop_port)).start()    
-
-    # Ping the Keep-alive Port once
-    ping_socket()
-    # Start Data Update Port connection & close after response
-    update_socket()
-    # Send Base Port configuration
-    try:
-        config_socket(led_count)
-    # Avoid logging Everloop errors on user quiting
-    except KeyboardInterrupt:
-        print(' quit')
+    # Process(target=register_error_callback, args=(wakeword_error_callback, matrix_ip, wakeword_port)).start()
+    # Start Data Update Port connection
+    Process(target=register_data_callback, args=(wakeword_data_callback, matrix_ip, wakeword_port)).start()
+    # Start Keep-alive Port connection
+    Process(target=ping_socket).start()
