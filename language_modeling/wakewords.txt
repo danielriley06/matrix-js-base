@@ -1,6 +1,8 @@
-matrix start action
-matrix stop action
+matrix start
+matrix stop
 matrix ring red
 matrix ring blue
 matrix ring green
 matrix ring clear
+alexa start
+alexa stop
