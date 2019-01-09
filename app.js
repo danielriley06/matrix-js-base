@@ -38,7 +38,7 @@ errorSocket.on('message', function(error_message) {
 function startWakeUpRecognition(){
   console.log('<== config wakeword recognition..')
   var wakeword_config = matrix_io.malos.v1.io.WakeWordParams.create({
-    wakeWord: 'MIA',
+    wakeWord: 'MATRIX',
     lmPath: LM_PATH,
     dicPath: DIC_PATH,
     channel: matrix_io.malos.v1.io.WakeWordParams.MicChannel.channel8,
