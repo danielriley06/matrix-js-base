@@ -17,7 +17,7 @@ var config = matrix_io.malos.v1.driver.DriverConfig.create(
   wakeword: matrix_io.malos.v1.io.WakeWordParams.create({
     lmPath: LM_PATH,
     dicPath: DIC_PATH,
-    channel: matrix_io.malos.v1.io.WakeWordParams.MicChannel.channel8,
+    channel: matrix_io.malos.v1.io.WakeWordParams.MicChannel.channel5,
     enableVerbose: true
   })
 });
