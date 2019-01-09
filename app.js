@@ -1,60 +1,76 @@
 // Set Initial Variables \\
 var zmq = require('zeromq');// Asynchronous Messaging Framework
-var matrix_io = require('matrix-protos').matrix_io;// Protocol Buffers for MATRIX function
-var matrix_ip = '127.0.0.1';// Local IP
-var matrix_everloop_base_port = 20021// Port for Everloop driver
-var matrix_device_leds = 0;// Holds amount of LEDs on MATRIX device
+var matrix_io = require('matrix-protos').matrix_io;// MATRIX Protocol Buffers
+var matrix_ip = '127.0.0.1';// Local Device IP
+var matrix_wakeword_base_port = 60001; // Wakeword base port
+const LM_PATH = './language_modeling/2585.lm';// Language Model File
+const DIC_PATH = './language_modeling/2585.dic';// Dictation File
 
-// ERROR PORT \\
-var errorSocket = zmq.socket('sub');// Create a Subscriber socket
-errorSocket.connect('tcp://' + matrix_ip + ':' + (matrix_everloop_base_port + 2));// Connect Subscriber to Error port
-errorSocket.subscribe('');// Subscribe to messages
+// BASE PORT \\
+// Create a Pusher socket
+var configSocket = zmq.socket('push');
+// Connect Pusher to Base port
+configSocket.connect('tcp://' + matrix_ip + ':' + matrix_wakeword_base_port /* config */);
+// Create driver configuration
+var config = matrix_io.malos.v1.driver.DriverConfig.create(
+{ // Create & Set wakeword configurations
+  wakeword: matrix_io.malos.v1.io.WakeWordParams.create({
+    lmPath: LM_PATH,// Language model file path
+    dicPath: DIC_PATH,// Dictation file path
+    channel: matrix_io.malos.v1.io.WakeWordParams.MicChannel.channel8,// Desired MATRIX microphone
+    enableVerbose: false// Enable verbose option
+  })
+});
+// Send configuration to MATRIX device
+configSocket.send(matrix_io.malos.v1.driver.DriverConfig.encode(config).finish());
+console.log('Listening for wakewords');
+
+// KEEP-ALIVE PORT \\
+// Create a Pusher socket
+var pingSocket = zmq.socket('push');
+// Connect Pusher to Keep-alive port
+pingSocket.connect('tcp://' + matrix_ip + ':' + (matrix_wakeword_base_port + 1));
+// Send initial ping
+pingSocket.send('');
+// Send a ping every 2 seconds
+setInterval(function(){
+  pingSocket.send('');// Send ping
+}, 2000);
+
+// ERROR PORT \\ (!Currently Experiencing False Errors!)
+// Create a Subscriber socket
+var errorSocket = zmq.socket('sub');
+// Connect Subscriber to Error port
+errorSocket.connect('tcp://' + matrix_ip + ':' + (matrix_wakeword_base_port + 2));
+// Connect Subscriber to Error port
+errorSocket.subscribe('');
 // On Message
-errorSocket.on('message', (error_message) => {
-    console.log('Error received: ' + error_message.toString('utf8'));// Log error
+errorSocket.on('message', function(error_message){
+  //console.log('Error received: ' + error_message.toString('utf8'));// Log error
 });
 
 // DATA UPDATE PORT \\
-var updateSocket = zmq.socket('sub');// Create a Subscriber socket
-updateSocket.connect('tcp://' + matrix_ip + ':' + (matrix_everloop_base_port + 3));// Connect Subscriber to Data Update port
-updateSocket.subscribe('');// Subscribe to messages
+// Create a Subscriber socket
+var updateSocket = zmq.socket('sub');
+// Connect Subscriber to Base port
+updateSocket.connect('tcp://' + matrix_ip + ':' + (matrix_wakeword_base_port + 3));
+// Subscribe to messages
+updateSocket.subscribe('');
 // On Message
-updateSocket.on('message', (buffer) => {
-    var data = matrix_io.malos.v1.io.EverloopImage.decode(buffer);// Extract message
-    matrix_device_leds = data.everloopLength;// Save MATRIX device LED count
+updateSocket.on('message', function(wakeword_buffer) {
+  // Extract message
+  var wakeWordData = matrix_io.malos.v1.io.WakeWordParams.decode(wakeword_buffer);
+  // Log message
+  console.log(wakeWordData);
+  // Run actions based on the phrase heard
+  switch(wakeWordData.wakeWord) {
+    // CHANGE TO YOUR PHRASE
+    case "MATRIX START":
+      console.log('I HEARD MATRIX START!');
+      break;
+    // CHANGE TO YOUR PHRASE
+    case "MATRIX STOP":
+      console.log('I HEARD MATRIX STOP!');
+      break;
+  }
 });
-
-// KEEP-ALIVE PORT \\
-var pingSocket = zmq.socket('push');// Create a Pusher socket
-pingSocket.connect('tcp://' + matrix_ip + ':' + (matrix_everloop_base_port + 1));// Connect Pusher to Keep-alive port
-pingSocket.send('');// Send a single ping
-
-// BASE PORT \\
-var configSocket = zmq.socket('push');// Create a Pusher socket
-configSocket.connect('tcp://' + matrix_ip + ':' + matrix_everloop_base_port);// Connect Pusher to Base port
-
-// Create an empty Everloop image
-var image = matrix_io.malos.v1.io.EverloopImage.create();
-
-// Loop every 50 milliseconds
-setInterval(function(){
-    // For each device LED
-    for (var i = 0; i < matrix_device_leds; ++i) {
-        // Set individual LED value
-        image.led[i] = {
-            red: Math.floor(Math.random() * 200)+1,
-            green: Math.floor(Math.random() * 255)+1,
-            blue: Math.floor(Math.random() * 50)+1,
-            white: 0
-        };
-    }
-
-    // Store the Everloop image in MATRIX configuration
-    var config = matrix_io.malos.v1.driver.DriverConfig.create({
-        'image': image
-    });
-
-    // Send MATRIX configuration to MATRIX device
-    if(matrix_device_leds > 0)
-        configSocket.send(matrix_io.malos.v1.driver.DriverConfig.encode(config).finish());
-},50);

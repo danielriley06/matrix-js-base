@@ -1,0 +1,64 @@
+Language model created by QuickLM on Tue Jan  8 21:17:30 EST 2019
+Copyright (c) 1996-2010 Carnegie Mellon University and Alexander I. Rudnicky
+
+The model is in standard ARPA format, designed by Doug Paul while he was at MITRE.
+
+The code that was used to produce this language model is available in Open Source.
+Please visit http://www.speech.cs.cmu.edu/tools/ for more information
+
+The (fixed) discount mass is 0.5. The backoffs are computed using the ratio method.
+This model based on a corpus of 6 sentences and 11 words
+
+\data\
+ngram 1=11
+ngram 2=15
+ngram 3=15
+
+\1-grams:
+-1.0000 </s> -0.3010
+-1.0000 <s> -0.2553
+-1.4771 ACTION -0.2553
+-1.7782 BLUE -0.2553
+-1.7782 CLEAR -0.2553
+-1.7782 GREEN -0.2553
+-1.0000 MATRIX -0.2553
+-1.7782 RED -0.2553
+-1.1761 RING -0.2711
+-1.7782 START -0.2863
+-1.7782 STOP -0.2863
+
+\2-grams:
+-0.3010 <s> MATRIX 0.0000
+-0.3010 ACTION </s> -0.3010
+-0.3010 BLUE </s> -0.3010
+-0.3010 CLEAR </s> -0.3010
+-0.3010 GREEN </s> -0.3010
+-0.4771 MATRIX RING 0.0000
+-1.0792 MATRIX START 0.0000
+-1.0792 MATRIX STOP 0.0000
+-0.3010 RED </s> -0.3010
+-0.9031 RING BLUE 0.0000
+-0.9031 RING CLEAR 0.0000
+-0.9031 RING GREEN 0.0000
+-0.9031 RING RED 0.0000
+-0.3010 START ACTION 0.0000
+-0.3010 STOP ACTION 0.0000
+
+\3-grams:
+-0.4771 <s> MATRIX RING
+-1.0792 <s> MATRIX START
+-1.0792 <s> MATRIX STOP
+-0.9031 MATRIX RING BLUE
+-0.9031 MATRIX RING CLEAR
+-0.9031 MATRIX RING GREEN
+-0.9031 MATRIX RING RED
+-0.3010 MATRIX START ACTION
+-0.3010 MATRIX STOP ACTION
+-0.3010 RING BLUE </s>
+-0.3010 RING CLEAR </s>
+-0.3010 RING GREEN </s>
+-0.3010 RING RED </s>
+-0.3010 START ACTION </s>
+-0.3010 STOP ACTION </s>
+
+\end\
