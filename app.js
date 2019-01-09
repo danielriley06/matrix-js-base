@@ -42,7 +42,7 @@ function startWakeUpRecognition(){
     lmPath: LM_PATH,
     dicPath: DIC_PATH,
     channel: matrix_io.malos.v1.io.WakeWordParams.MicChannel.channel8,
-    enableVerbose: false
+    enableVerbose: true
   });
 
   sendConfigProto(wakeword_config);
