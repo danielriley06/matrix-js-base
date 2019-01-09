@@ -14,7 +14,7 @@ var creator_wakeword_base_port = 60001
 var creator_everloop_base_port = 20013 + 8 // port for Everloop driver.
 // Packaged Protocol buffers
 var matrix_io = require('matrix-protos').matrix_io;
-var zmq = require('zmq')
+var zmq = require('zeromq')
 
 const LM_PATH = '/language_modeling/2585.lm'
 const DIC_PATH = '/language_modeling/2585.dic'
