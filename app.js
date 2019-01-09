@@ -3,8 +3,8 @@ var zmq = require('zeromq');// Asynchronous Messaging Framework
 var matrix_io = require('matrix-protos').matrix_io;// MATRIX Protocol Buffers
 var matrix_ip = '127.0.0.1';// Local Device IP
 var matrix_wakeword_base_port = 60001; // Wakeword base port
-const LM_PATH = '/2585.lm';// Language Model File
-const DIC_PATH = '/2585.dic';// Dictation File
+const LM_PATH = './2585.lm';// Language Model File
+const DIC_PATH = './2585.dic';// Dictation File
 
 // BASE PORT \\
 // Create a Pusher socket
@@ -15,10 +15,9 @@ configSocket.connect('tcp://' + matrix_ip + ':' + matrix_wakeword_base_port /* c
 var config = matrix_io.malos.v1.driver.DriverConfig.create(
 { // Create & Set wakeword configurations
   wakeword: matrix_io.malos.v1.io.WakeWordParams.create({
-    lmPath: LM_PATH,// Language model file path
-    dicPath: DIC_PATH,// Dictation file path
-    channel: matrix_io.malos.v1.io.WakeWordParams.MicChannel.channel8,// Desired MATRIX microphone
-    enableVerbose: true// Enable verbose option
+    dicPath: DIC_PATH,
+    channel: matrix_io.malos.v1.io.WakeWordParams.MicChannel.channel8,
+    enableVerbose: true
   })
 });
 // Send configuration to MATRIX device
