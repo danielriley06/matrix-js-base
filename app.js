@@ -1,129 +1,76 @@
-// This is how we connect to the creator. IP and port.
-// The IP is the IP I'm using and you need to edit it.
-// By default, MALOS has its 0MQ ports open to the world.
+// Set Initial Variables \\
+var zmq = require('zeromq');// Asynchronous Messaging Framework
+var matrix_io = require('matrix-protos').matrix_io;// MATRIX Protocol Buffers
+var matrix_ip = '127.0.0.1';// Local Device IP
+var matrix_wakeword_base_port = 60001; // Wakeword base port
+const LM_PATH = '/2585.lm';// Language Model File
+const DIC_PATH = '/2585.dic';// Dictation File
 
-// Every device is identified by a base port. Then the mapping works
-// as follows:
-// BasePort     => Configuration port. Used to config the device.
-// BasePort + 1 => Keepalive port. Send pings to this port.
-// BasePort + 2 => Error port. Receive errros from device.
-// BasePort + 3 => Data port. Receive data from device.
-
-var creator_ip = process.env.CREATOR_IP || '127.0.0.1';
-var creator_wakeword_base_port = 60001
-var creator_everloop_base_port = 20013 + 8 // port for Everloop driver.
-// Packaged Protocol buffers
-var matrix_io = require('matrix-protos').matrix_io;
-var zmq = require('zeromq')
-
-const LM_PATH = '/language_modeling/2585.lm'
-const DIC_PATH = '/language_modeling/2585.dic'
-
-var configSocket = zmq.socket('push')
-configSocket.connect('tcp://' + creator_ip + ':' + creator_wakeword_base_port /* config */)
-
-// ********** Start error management.
-var errorSocket = zmq.socket('sub')
-errorSocket.connect('tcp://' + creator_ip + ':' + (creator_wakeword_base_port + 2))
-errorSocket.subscribe('')
-errorSocket.on('message', function(error_message) {
-  process.stdout.write('Received Wakeword error: ' + error_message.toString('utf8') + "\n")
+// BASE PORT \\
+// Create a Pusher socket
+var configSocket = zmq.socket('push');
+// Connect Pusher to Base port
+configSocket.connect('tcp://' + matrix_ip + ':' + matrix_wakeword_base_port /* config */);
+// Create driver configuration
+var config = matrix_io.malos.v1.driver.DriverConfig.create(
+{ // Create & Set wakeword configurations
+  wakeword: matrix_io.malos.v1.io.WakeWordParams.create({
+    lmPath: LM_PATH,// Language model file path
+    dicPath: DIC_PATH,// Dictation file path
+    channel: matrix_io.malos.v1.io.WakeWordParams.MicChannel.channel8,// Desired MATRIX microphone
+    enableVerbose: true// Enable verbose option
+  })
 });
-// ********** End error management.
+// Send configuration to MATRIX device
+configSocket.send(matrix_io.malos.v1.driver.DriverConfig.encode(config).finish());
+console.log('Listening for wakewords');
 
-/**************************************
- * start/stop service functions
- **************************************/
+// KEEP-ALIVE PORT \\
+// Create a Pusher socket
+var pingSocket = zmq.socket('push');
+// Connect Pusher to Keep-alive port
+pingSocket.connect('tcp://' + matrix_ip + ':' + (matrix_wakeword_base_port + 1));
+// Send initial ping
+pingSocket.send('');
+// Send a ping every 2 seconds
+setInterval(function(){
+  pingSocket.send('');// Send ping
+}, 2000);
 
-function startWakeUpRecognition(){
-  console.log('<== config wakeword recognition..')
-  var wakeword_config = matrix_io.malos.v1.io.WakeWordParams.create({
-    wakeWord: 'MATRIX',
-    lmPath: LM_PATH,
-    dicPath: DIC_PATH,
-    channel: matrix_io.malos.v1.io.WakeWordParams.MicChannel.channel8,
-    enableVerbose: true
-  });
+// ERROR PORT \\ (!Currently Experiencing False Errors!)
+// Create a Subscriber socket
+var errorSocket = zmq.socket('sub');
+// Connect Subscriber to Error port
+errorSocket.connect('tcp://' + matrix_ip + ':' + (matrix_wakeword_base_port + 2));
+// Connect Subscriber to Error port
+errorSocket.subscribe('');
+// On Message
+errorSocket.on('message', function(error_message){
+  //console.log('Error received: ' + error_message.toString('utf8'));// Log error
+});
 
-  sendConfigProto(wakeword_config);
-}
-
-function stopWakeUpRecognition(){
-  console.log('<== stop wakeword recognition..')
-  var wakeword_config = matrix_io.malos.v1.io.WakeWordParams.create({stopRecognition: true});
-  sendConfigProto(wakeword_config);
-}
-
-/**************************************
- * Register wakeword callbacks
- **************************************/
-
-var updateSocket = zmq.socket('sub')
-updateSocket.connect('tcp://' + creator_ip + ':' + (creator_wakeword_base_port + 3))
-updateSocket.subscribe('')
-
+// DATA UPDATE PORT \\
+// Create a Subscriber socket
+var updateSocket = zmq.socket('sub');
+// Connect Subscriber to Base port
+updateSocket.connect('tcp://' + matrix_ip + ':' + (matrix_wakeword_base_port + 3));
+// Subscribe to messages
+updateSocket.subscribe('');
+// On Message
 updateSocket.on('message', function(wakeword_buffer) {
+  // Extract message
   var wakeWordData = matrix_io.malos.v1.io.WakeWordParams.decode(wakeword_buffer);
-  console.log('==> WakeWord Reached:', wakeWordData.wakeWord)
-    
-    switch(wakeWordData.wakeWord) {
-      case "MIA RING RED":
-        setEverloop(255, 0, 25, 0, 0.05)
-        break;
-      case "MIA RING BLUE":
-        setEverloop(0, 25, 255, 0, 0.05) 
-        break;
-      case "MIA RING GREEN":
-        setEverloop(0, 255, 100, 0, 0.05) 
-        break;
-      case "MIA RING ORANGE":
-        setEverloop(255, 77, 0, 0, 0.05) 
-        break;
-      case "MIA RING CLEAR":
-        setEverloop(0, 0, 0, 0, 0) 
-        break;
-    }
+  // Log message
+  console.log(wakeWordData);
+  // Run actions based on the phrase heard
+  switch(wakeWordData.wakeWord) {
+    // CHANGE TO YOUR PHRASE
+    case "MATRIX START":
+      console.log('I HEARD MATRIX START!');
+      break;
+    // CHANGE TO YOUR PHRASE
+    case "MATRIX STOP":
+      console.log('I HEARD MATRIX STOP!');
+      break;
+  }
 });
-
-/**************************************
- * Everloop Ring LEDs handler
- **************************************/
-
-var ledsConfigSocket = zmq.socket('push')
-ledsConfigSocket.connect('tcp://' + creator_ip + ':' + creator_everloop_base_port /* config */)
-
-function setEverloop(r, g, b, w, i) {
-    var image = matrix_io.malos.v1.io.EverloopImage.create();
-    for (var j = 0; j < 35; ++j) {
-      var ledValue = matrix_io.malos.v1.io.LedValue.create({
-        red: Math.round(r*i),
-        green: Math.round(g*i),
-        blue: Math.round(b*i),
-        white: Math.round(w*i)
-      });
-      image.led.push(ledValue)
-    }
-    var config = matrix_io.malos.v1.driver.DriverConfig.create({
-      image: image
-    })
-
-    // Send the configuration
-    ledsConfigSocket.send(matrix_io.malos.v1.driver.DriverConfig.encode(config).finish());
-}
-
-/**************************************
- * sendConfigProto: build Proto message 
- **************************************/
-
-function sendConfigProto(cfg){
-  var config = matrix_io.malos.v1.driver.DriverConfig.create({ wakeword: cfg })
-  const serialized = JSON.stringify(matrix_io.malos.v1.driver.DriverConfig.toObject(config))
-  console.log("==> sending conf ", serialized)
-  configSocket.send(matrix_io.malos.v1.driver.DriverConfig.encode(config).finish())
-}
-
-/**********************************************
- ****************** MAIN **********************
- **********************************************/
-
-startWakeUpRecognition();
